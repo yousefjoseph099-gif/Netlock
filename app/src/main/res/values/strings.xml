@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">NetLock</string>
+    <string name="notification_channel_name">Website Filter Active</string>
+</resources>
