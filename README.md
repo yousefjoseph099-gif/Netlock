@@ -47,11 +47,28 @@ DNS-filtering apps (e.g. DNS66, PersonalDNSFilter).
     for NetLock to work reliably.
   - A site that hardcodes a raw IP address (very rare in normal browsing) would
     not be caught, since there's no domain lookup to intercept.
-- **Uninstall protection is not implemented.** Android does not let a normal app
-  prevent its own uninstallation. A determined user could uninstall NetLock the
-  same way as any app. (A `DeviceAdminReceiver` could add friction here in a
-  future version, but that requires an intrusive permission and was intentionally
-  left out of this build to keep the app simple and low-permission.)
+- **Turning it off without the password - what's actually preventable, and what isn't:**
+  - The notification has **no direct stop button** - it only opens the app, where
+    the password gate applies to Start/Stop.
+  - If the VPN is disconnected from **Settings > Network > VPN**, the app detects
+    that (`onRevoke()`) and, if a password is set, **automatically reconnects**
+    using the same app selection - so a quick toggle there doesn't stick.
+  - **Force Stop from Settings > Apps > NetLock cannot be intercepted by any app,
+    including this one.** When Android force-stops a process, it kills it directly
+    without calling any app code first - there's no callback to react to. This is
+    true for every non-root Android app, not a gap specific to NetLock; it's a
+    deliberate OS guarantee that any app can always be killed by the user, mainly
+    to keep malware from making itself un-removable.
+  - Uninstalling the app the normal way is also always possible for the same
+    reason. The only way to change this ceiling is **Device Owner / MDM
+    provisioning** (used by company-managed phones), which lets an app restrict
+    uninstall and Settings access - but that has to be set up via ADB at
+    provisioning time (`adb shell dpm set-device-owner ...`), typically on a
+    freshly-factory-reset device, and isn't something a normal APK install can
+    switch on for itself. It's a legitimate next step if you want something
+    closer to unbypassable, but it's a bigger commitment (the device is then
+    "managed") and was left out of this build to keep it a simple, low-permission
+    install.
 - Only one whitelist/blacklist is checked at a time, per the mode you pick.
 
 ## Project structure

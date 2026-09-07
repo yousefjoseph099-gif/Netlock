@@ -116,7 +116,11 @@ class FilterVpnService : VpnService() {
             return
         }
 
-        vpnInterface = builder.establish()
+        vpnInterface = try {
+            builder.establish()
+        } catch (e: Exception) {
+            null
+        }
         val iface = vpnInterface ?: run {
             stopSelf()
             return
@@ -229,8 +233,31 @@ class FilterVpnService : VpnService() {
     }
 
     override fun onRevoke() {
-        // User revoked the VPN permission from system settings.
-        stopSelfAndVpn()
+        // The system tore down our tunnel - either the user disconnected it from
+        // Settings > Network > VPN, or another VPN app took over the single VPN slot.
+        //
+        // If no password is set, the user hasn't asked for tamper-resistance, so we
+        // respect it and stop cleanly. If a password IS set, we treat this the same
+        // as someone trying to bypass the lock without entering it: reconnect right
+        // away using the same app selection, rather than silently staying off.
+        val prefs = Prefs.getInstance(this)
+        val selectedPackages = prefs.selectedPackages
+
+        if (!prefs.hasPassword() || selectedPackages.isEmpty()) {
+            stopSelfAndVpn()
+            super.onRevoke()
+            return
+        }
+
+        try { vpnInterface?.close() } catch (e: Exception) { /* ignore */ }
+        vpnInterface = null
+
+        // A short delay avoids hammering establish() in a tight loop if the
+        // permission really was fully revoked and re-establishing keeps failing.
+        android.os.Handler(mainLooper).postDelayed({
+            establishVpn(selectedPackages)
+        }, 500)
+
         super.onRevoke()
     }
 
@@ -250,19 +277,13 @@ class FilterVpnService : VpnService() {
             PendingIntent.FLAG_IMMUTABLE
         )
 
-        val stopIntent = PendingIntent.getService(
-            this, 0,
-            Intent(this, FilterVpnService::class.java).setAction(ACTION_STOP),
-            PendingIntent.FLAG_IMMUTABLE
-        )
-
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("NetLock protection is active")
-            .setContentText("Tap to open. Filtering is applied to the apps you selected.")
+            .setContentText("Open the app and enter your password to change settings or stop.")
             .setSmallIcon(R.drawable.ic_launcher)
             .setContentIntent(openAppIntent)
-            .addAction(0, "Stop", stopIntent)
             .setOngoing(true)
+            .setAutoCancel(false)
             .build()
     }
 }
