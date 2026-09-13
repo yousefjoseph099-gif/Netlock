@@ -162,6 +162,7 @@ class FilterVpnService : VpnService() {
                 InetAddress.getByName(DNS_IP), query.srcIp, query.srcPort, response
             )
             synchronized(this) { output.write(responsePacket) }
+            logBlocked(hostname)
             return
         }
 
@@ -205,6 +206,23 @@ class FilterVpnService : VpnService() {
         return when (mode) {
             BlockMode.WHITELIST -> !matchesAny(hostname, whitelistCache)
             BlockMode.BLACKLIST -> matchesAny(hostname, blacklistCache)
+        }
+    }
+
+    /**
+     * Records a blocked lookup so the user can see, right when playback or a
+     * page breaks, which exact domain was refused - very often a separate
+     * CDN/video-delivery domain the site depends on that whitelisting the
+     * site's own domain doesn't cover. Fire-and-forget; never blocks the
+     * DNS response path above it.
+     */
+    private fun logBlocked(hostname: String) {
+        val dao = AppDatabase.getInstance(this).domainDao()
+        scope.launch {
+            dao.insertBlockedLog(
+                com.netlock.app.data.BlockedLogEntity(domain = hostname, timestampMillis = System.currentTimeMillis())
+            )
+            dao.trimBlockedLog()
         }
     }
 

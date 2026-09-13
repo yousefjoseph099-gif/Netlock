@@ -1,6 +1,8 @@
 package com.netlock.app
 
 import android.Manifest
+import android.app.admin.DevicePolicyManager
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.VpnService
@@ -29,6 +31,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var prefs: Prefs
     private lateinit var db: AppDatabase
     private lateinit var adapter: DomainAdapter
+    private lateinit var devicePolicyManager: DevicePolicyManager
+    private lateinit var adminComponent: ComponentName
+
+    // True while we're forcing the password re-entry gate that appears after
+    // device admin protection was deactivated (see Prefs.adminTamperFlag).
+    // While this is true, normal UI interaction is blocked underneath it.
+    private var tamperGateActive = false
 
     private var currentTab: ListType = ListType.WHITELIST
 
@@ -87,12 +96,41 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.RequestPermission()
     ) { /* no-op either way, notification is best-effort */ }
 
+    private val adminRequestLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        // Whatever the user chose in the system dialog, just re-read the real
+        // state from DevicePolicyManager rather than assuming from resultCode.
+        prefs.deviceAdminActive = devicePolicyManager.isAdminActive(adminComponent)
+        refreshAdminStatusLabel()
+        if (!prefs.deviceAdminActive) {
+            Toast.makeText(this, "Uninstall protection was not enabled", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Tamper re-entry gate has its own unlock flow separate from unlockLauncher
+    // so it can't be dismissed by cancelling - Cancel just re-shows it.
+    private val tamperUnlockLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            prefs.adminTamperFlag = false
+            tamperGateActive = false
+            refreshAdminStatusLabel()
+        } else {
+            // Cancel doesn't get you out of this one - re-show immediately.
+            showTamperGate()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         prefs = Prefs.getInstance(this)
         db = AppDatabase.getInstance(this)
+        devicePolicyManager = getSystemService(DevicePolicyManager::class.java)
+        adminComponent = ComponentName(this, NetLockDeviceAdminReceiver::class.java)
 
         setSupportActionBar(findViewById(R.id.toolbar))
 
@@ -101,17 +139,90 @@ class MainActivity : AppCompatActivity() {
         setupAppPicker()
         setupPasswordControls()
         setupVpnToggle()
+        setupAdminToggle()
 
         requestNotificationPermissionIfNeeded()
         observeCurrentList()
         refreshSelectedAppsLabel()
         refreshPasswordStatus()
         refreshVpnStatusLabel()
+        refreshAdminStatusLabel()
     }
 
     override fun onResume() {
         super.onResume()
         refreshVpnStatusLabel()
+        // Keep our record honest in case admin was deactivated while we were
+        // backgrounded (the Prefs.deviceAdminActive flag alone can't be
+        // trusted as the source of truth - ask the OS directly too).
+        prefs.deviceAdminActive = devicePolicyManager.isAdminActive(adminComponent)
+        refreshAdminStatusLabel()
+
+        if (prefs.adminTamperFlag && !tamperGateActive) {
+            showTamperGate()
+        }
+    }
+
+    // ---------- Device admin / uninstall protection ----------
+
+    private fun setupAdminToggle() {
+        findViewById<Button>(R.id.btnToggleAdmin).setOnClickListener {
+            if (devicePolicyManager.isAdminActive(adminComponent)) {
+                // Deactivating from inside the app still goes through the same
+                // password gate everything else here uses; the direct Settings
+                // path (Settings > Security > Device admin apps) is always
+                // reachable too and can't be blocked - that path is covered by
+                // the tamper flag set in NetLockDeviceAdminReceiver.onDisabled.
+                runProtected {
+                    devicePolicyManager.removeActiveAdmin(adminComponent)
+                    prefs.deviceAdminActive = false
+                    refreshAdminStatusLabel()
+                }
+            } else {
+                if (!prefs.hasPassword()) {
+                    Toast.makeText(
+                        this, "Set a password first - uninstall protection needs one to be worth enabling",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    return@setOnClickListener
+                }
+                runProtected {
+                    val intent = Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
+                        putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, adminComponent)
+                        putExtra(
+                            DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                            "This lets NetLock block direct uninstall. You'll need to deactivate it here first (Settings > Security > Device admin apps) before the app can be removed."
+                        )
+                    }
+                    adminRequestLauncher.launch(intent)
+                }
+            }
+        }
+    }
+
+    private fun refreshAdminStatusLabel() {
+        val active = devicePolicyManager.isAdminActive(adminComponent)
+        findViewById<TextView>(R.id.tvAdminStatus).text =
+            if (active) "On - Uninstall is blocked until this is turned off first."
+            else "Off - the app can be uninstalled normally."
+        findViewById<Button>(R.id.btnToggleAdmin).text =
+            if (active) "Turn off uninstall protection" else "Turn on uninstall protection"
+    }
+
+    /**
+     * Full-screen, non-dismissable-by-cancel prompt shown when we detect that
+     * device admin protection was removed via the system Settings path. It
+     * requires the same NetLock password used everywhere else in the app -
+     * there is no separate "admin password". It cannot undo the deactivation
+     * (impossible for any app to do), it only confirms who did it before the
+     * rest of the app becomes usable again.
+     */
+    private fun showTamperGate() {
+        tamperGateActive = true
+        tamperUnlockLauncher.launch(
+            Intent(this, UnlockActivity::class.java)
+                .putExtra(UnlockActivity.EXTRA_REASON, getString(R.string.tamper_gate_message))
+        )
     }
 
     // ---------- Password gate helper ----------
@@ -264,6 +375,13 @@ class MainActivity : AppCompatActivity() {
                 runProtected { stopVpnService() }
             } else {
                 startProtectionFlow()
+            }
+        }
+        findViewById<Button>(R.id.btnViewBlockedLog).setOnClickListener {
+            // Gated like the other domain-list screens (AppPicker, domain add) since
+            // it lets you add entries straight to the whitelist from here too.
+            runProtected {
+                startActivity(Intent(this, BlockedLogActivity::class.java))
             }
         }
     }

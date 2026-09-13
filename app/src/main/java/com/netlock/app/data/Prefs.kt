@@ -55,12 +55,30 @@ class Prefs private constructor(context: Context) {
         get() = prefs.getBoolean(KEY_RUNNING, false)
         set(value) = prefs.edit().putBoolean(KEY_RUNNING, value).apply()
 
+    /** Whether NetLockDeviceAdminReceiver is currently an active device admin. */
+    var deviceAdminActive: Boolean
+        get() = prefs.getBoolean(KEY_ADMIN_ACTIVE, false)
+        set(value) = prefs.edit().putBoolean(KEY_ADMIN_ACTIVE, value).apply()
+
+    /**
+     * Set the instant device admin protection is deactivated (see
+     * NetLockDeviceAdminReceiver.onDisabled). MainActivity checks this on
+     * every resume and, if set, forces a password re-entry before anything
+     * else in the app can be used - it does not and cannot undo the
+     * deactivation itself.
+     */
+    var adminTamperFlag: Boolean
+        get() = prefs.getBoolean(KEY_ADMIN_TAMPER, false)
+        set(value) = prefs.edit().putBoolean(KEY_ADMIN_TAMPER, value).apply()
+
     companion object {
         private const val KEY_MODE = "mode"
         private const val KEY_SALT = "pw_salt"
         private const val KEY_HASH = "pw_hash"
         private const val KEY_PACKAGES = "packages"
         private const val KEY_RUNNING = "running"
+        private const val KEY_ADMIN_ACTIVE = "device_admin_active"
+        private const val KEY_ADMIN_TAMPER = "device_admin_tamper_flag"
 
         @Volatile private var INSTANCE: Prefs? = null
 

@@ -1,4 +1,6 @@
 <resources>
     <string name="app_name">NetLock</string>
     <string name="notification_channel_name">Website Filter Active</string>
+    <string name="device_admin_disable_warning">Turning this off removes NetLock\'s uninstall protection. You\'ll be asked for your NetLock password again next time you open the app.</string>
+    <string name="tamper_gate_message">Uninstall protection was just turned off from Settings. Enter your NetLock password to confirm before continuing.</string>
 </resources>

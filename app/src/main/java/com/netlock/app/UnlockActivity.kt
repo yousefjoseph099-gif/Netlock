@@ -16,6 +16,11 @@ import com.netlock.app.util.PasswordUtils
  */
 class UnlockActivity : Activity() {
 
+    companion object {
+        /** Optional string extra shown above the password field, e.g. to explain why re-entry is required. */
+        const val EXTRA_REASON = "reason"
+    }
+
     private lateinit var etPassword: EditText
     private lateinit var tvError: TextView
 
@@ -25,6 +30,13 @@ class UnlockActivity : Activity() {
 
         etPassword = findViewById(R.id.etPassword)
         tvError = findViewById(R.id.tvError)
+
+        intent.getStringExtra(EXTRA_REASON)?.let { reason ->
+            findViewById<TextView>(R.id.tvReason)?.apply {
+                text = reason
+                visibility = View.VISIBLE
+            }
+        }
 
         findViewById<Button>(R.id.btnCancel).setOnClickListener {
             setResult(RESULT_CANCELED)

@@ -56,6 +56,13 @@
                     android:backgroundTint="@color/accent"
                     android:text="Start Protection"
                     android:textColor="@color/white" />
+
+                <Button
+                    android:id="@+id/btnViewBlockedLog"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Something broke? See what got blocked" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 
@@ -270,6 +277,50 @@
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
                     android:text="Set / change password" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <androidx.cardview.widget.CardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="2dp"
+            android:layout_marginBottom="32dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="16dp">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Uninstall protection"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tvAdminStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textSize="13sp"
+                    android:text="Off - the app can be uninstalled normally." />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textSize="12sp"
+                    android:textColor="#808080"
+                    android:text="Requires a password to be set first. Turning it on means Uninstall will fail until this protection is turned off again from Settings &gt; Security &gt; Device admin apps." />
+
+                <Button
+                    android:id="@+id/btnToggleAdmin"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="Turn on uninstall protection" />
             </LinearLayout>
         </androidx.cardview.widget.CardView>
 

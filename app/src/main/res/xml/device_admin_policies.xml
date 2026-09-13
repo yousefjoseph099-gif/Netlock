@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  We deliberately request NO uses-policies here. Simply being an active device
+  administrator is what makes Android refuse a direct uninstall (it forces
+  "deactivate admin first"); we don't need or want the ability to wipe data,
+  force a lock-screen password, disable the camera, etc., so nothing is
+  declared below.
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+    </uses-policies>
+</device-admin>

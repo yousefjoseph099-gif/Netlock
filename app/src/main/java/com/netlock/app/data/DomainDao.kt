@@ -27,4 +27,22 @@ interface DomainDao {
 
     @Query("DELETE FROM domains WHERE listType = :type")
     suspend fun clearType(type: ListType)
+
+    // ---- Blocked-domain diagnostic log ----
+
+    @Query("SELECT * FROM blocked_log ORDER BY timestampMillis DESC LIMIT :limit")
+    fun observeRecentBlocked(limit: Int = 100): Flow<List<BlockedLogEntity>>
+
+    @Insert
+    suspend fun insertBlockedLog(entry: BlockedLogEntity)
+
+    /** Keeps the log from growing forever - called after each insert. */
+    @Query(
+        "DELETE FROM blocked_log WHERE id NOT IN " +
+        "(SELECT id FROM blocked_log ORDER BY timestampMillis DESC LIMIT :keep)"
+    )
+    suspend fun trimBlockedLog(keep: Int = 200)
+
+    @Query("DELETE FROM blocked_log")
+    suspend fun clearBlockedLog()
 }
